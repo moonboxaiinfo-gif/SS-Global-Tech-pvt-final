@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "npm --prefix client install && npm --prefix client run build",
     "build:static": "vite build",
-    "build:app": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && rm -rf client/dist && mkdir -p client/dist && cp -R dist/public/. client/dist/",
+    "build:app": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && node -e \"const fs=require('fs'); const path=require('path'); fs.rmSync('client/dist',{recursive:true,force:true}); fs.mkdirSync('client/dist',{recursive:true}); const src='dist/public'; for (const entry of fs.readdirSync(src,{withFileTypes:true})) { const from=path.join(src,entry.name); const to=path.join('client/dist',entry.name); fs.cpSync(from,to,{recursive:true,force:true}); }\"",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",

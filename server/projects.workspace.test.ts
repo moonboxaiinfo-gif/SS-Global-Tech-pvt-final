@@ -11,14 +11,22 @@ describe("Workspace architecture", () => {
 });
 
 describe("Solar project company drill-down data", () => {
-  it("includes Hayleys and Deep Tech Solar partner projects", () => {
-    const partners = initialProjects.filter((project) => project.businessField === "solar").map((project) => project.partner);
-    expect(partners).toEqual(expect.arrayContaining(["Hayleys", "Deep Tech"]));
+  it("supports an empty solar project list without inventing demo data", () => {
+    expect(initialProjects).toEqual([]);
+    expect(initialProjects.filter((project) => project.businessField === "solar")).toEqual([]);
   });
 
-  it("keeps customer balances derived from project receipts", () => {
-    const project = initialProjects.find((item) => item.partner === "Hayleys");
-    expect(project).toBeDefined();
-    expect(balanceDue(project!)).toBe(project!.contractValue - project!.advanceReceived - project!.balancePayments.reduce((sum, payment) => sum + payment.amount, 0));
+  it("keeps customer balances derived from project receipts for legitimate partner references", () => {
+    const project = {
+      id: "hayleys-solar",
+      partner: "Hayleys",
+      businessField: "solar",
+      contractValue: 120000,
+      advanceReceived: 40000,
+      balancePayments: [{ id: "p1", projectId: "hayleys-solar", amount: 20000, date: "2026-01-01", method: "Bank", note: "Installment" }],
+    } as Parameters<typeof balanceDue>[0];
+
+    expect(project.partner).toBe("Hayleys");
+    expect(balanceDue(project)).toBe(project.contractValue - project.advanceReceived - project.balancePayments.reduce((sum, payment) => sum + payment.amount, 0));
   });
 });

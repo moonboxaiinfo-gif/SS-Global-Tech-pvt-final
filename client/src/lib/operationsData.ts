@@ -73,14 +73,7 @@ export type Role = {
   color: string;
   permissions: Record<string, boolean>;
 };
-export const operationsCompanies = [
-  "All companies",
-  "SunPeak Energy",
-  "Northline Electrical",
-  "Cedar Works",
-  "Aster Fabrication",
-  "BlueCurrent Services",
-];
+export const operationsCompanies = ["All companies"];
 export const warehouses = [
   "All warehouses",
   "Colombo Central",

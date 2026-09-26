@@ -9,13 +9,7 @@ export type PayoutType =
   | "Final Monthly Salary Settlement";
 export type ClaimStatus = "Draft" | "Submitted" | "Partially Paid" | "Paid";
 
-export const accountingCompanies = [
-  { id: "sunpeak", name: "SunPeak Energy", short: "SP" },
-  { id: "northline", name: "Northline Electrical", short: "NE" },
-  { id: "cedar", name: "Cedar Works", short: "CW" },
-  { id: "bluecurrent", name: "BlueCurrent Solar", short: "BC" },
-  { id: "aster", name: "Aster Fabrication", short: "AF" },
-];
+export const accountingCompanies = [];
 
 export const cashPosition = {
   bank: 0,

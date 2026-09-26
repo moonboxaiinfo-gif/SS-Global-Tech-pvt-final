@@ -45,6 +45,37 @@ const allowedRoles: AppRole[] = [
   "Accountant",
   "Technician",
 ];
+
+function ensureOwnerUser(users: AuthUser[]): AuthUser[] {
+  const owner = users.find(entry => entry.id === "user-owner");
+  const remaining = users.filter(entry => entry.id !== "user-owner");
+  const nextOwner: AuthUser = {
+    id: "user-owner",
+    email: "owner@admin.com",
+    displayName: "SS Global Owner",
+    role: "Owner",
+    passwordHash: OWNER_HASH,
+    active: true,
+    createdAt: owner?.createdAt || new Date().toISOString().slice(0, 10),
+    invitedAt: owner?.invitedAt,
+    authProvider: owner?.authProvider ?? "local",
+  };
+
+  const normalizedOwner = owner
+    ? {
+        ...owner,
+        ...nextOwner,
+        email: "owner@admin.com",
+        displayName: owner.displayName || "SS Global Owner",
+        role: "Owner",
+        passwordHash: OWNER_HASH,
+        active: true,
+      }
+    : nextOwner;
+
+  return [normalizedOwner, ...remaining];
+}
+
 export function normalizeAppRole(role: string): AppRole {
   return role === "Admin" || role === "Developer"
     ? "Owner"
@@ -76,27 +107,29 @@ const seedUsers: AuthUser[] = [];
 function getUsers(): AuthUser[] {
   const stored = loadLocalValue<unknown>(USERS_KEY, seedUsers);
   const users = Array.isArray(stored) ? (stored as AuthUser[]) : seedUsers;
-  return users
-    .filter((user): user is AuthUser =>
-      Boolean(
-        user &&
-          typeof user.id === "string" &&
-          typeof user.email === "string" &&
-          typeof user.role === "string" &&
-          typeof user.active === "boolean"
+  return ensureOwnerUser(
+    users
+      .filter((user): user is AuthUser =>
+        Boolean(
+          user &&
+            typeof user.id === "string" &&
+            typeof user.email === "string" &&
+            typeof user.role === "string" &&
+            typeof user.active === "boolean"
+        )
       )
-    )
-    .map(user =>
-      user.id === "user-owner"
-        ? {
-            ...user,
-            email: "owner@admin.com",
-            passwordHash: OWNER_HASH,
-            role: "Owner" as string,
-            active: true,
-          }
-        : { ...user, role: normalizeUserRole(user.role) }
-    );
+      .map(user =>
+        user.id === "user-owner"
+          ? {
+              ...user,
+              email: "owner@admin.com",
+              passwordHash: OWNER_HASH,
+              role: "Owner" as string,
+              active: true,
+            }
+          : { ...user, role: normalizeUserRole(user.role) }
+      )
+  );
 }
 function setUsers(users: AuthUser[]) {
   saveLocalValue(USERS_KEY, users);
