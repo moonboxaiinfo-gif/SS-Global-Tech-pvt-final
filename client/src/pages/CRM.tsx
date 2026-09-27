@@ -26,6 +26,13 @@ import {
 type CRMStatus = "New" | "Contacted" | "Converted";
 type CustomerRecord = CrmRecord;
 
+const normalizeWorkspace = (workspace?: string | null) => {
+  const value = (workspace ?? "all").trim().toLowerCase();
+  return ["all", "solar", "steel", "furniture", "irrigation"].includes(value)
+    ? value
+    : "all";
+};
+
 export default function CRM() {
   const { field } = useBusinessField();
   const [records, setRecords] = useState<CustomerRecord[]>([]);
@@ -42,6 +49,7 @@ export default function CRM() {
     email: "",
     phone: "",
     company: "",
+    workspace: field.id,
     status: "New" as CRMStatus,
     value: "",
     source: "Website inquiry",
@@ -76,17 +84,10 @@ export default function CRM() {
       active = false;
     };
   }, []);
-  const scopedRecords = useMemo(
-    () =>
-      records.filter(
-        record =>
-          field.id === "all" ||
-          record.company
-            .toLowerCase()
-            .includes(field.label.toLowerCase().split(" ")[0])
-      ),
-    [records, field.id, field.label]
-  );
+  const scopedRecords = useMemo(() => {
+    if (field.id === "all") return records;
+    return records.filter(record => normalizeWorkspace(record.workspace) === field.id);
+  }, [records, field.id]);
   const filteredRecords = useMemo(
     () =>
       scopedRecords.filter(
@@ -122,9 +123,10 @@ export default function CRM() {
     }
     const next: Omit<CustomerRecord, "id"> = {
       name: form.name.trim(),
-      email: form.email.trim() || "Not provided",
+      email: form.email.trim(),
       phone: form.phone.trim(),
-      company: form.company.trim() || "Independent customer",
+      company: form.company.trim(),
+      workspace: field.id,
       status: form.status,
       kind: form.kind,
       value: Number(form.value) || 0,
@@ -150,6 +152,7 @@ export default function CRM() {
       email: "",
       phone: "",
       company: "",
+      workspace: field.id,
       status: "New",
       value: "",
       source: "Website inquiry",

@@ -9,7 +9,8 @@ import {
 import { toast } from "sonner";
 import FieldScopeBanner from "@/components/FieldScopeBanner";
 import { useBusinessField } from "@/contexts/BusinessFieldContext";
-import { initialEmployees, mockCompanies, money } from "@/lib/hrData";
+import { listErpRows } from "@/lib/erpData";
+import { type Employee, mockCompanies, money } from "@/lib/hrData";
 import {
   advancesForEmployee,
   laborForEmployee,
@@ -23,24 +24,143 @@ import { queuePayrollBatch } from "@/lib/operationsSync";
 export type Advance = SalaryAdvance;
 export const salaryAdvances: Advance[] = loadSalaryAdvances();
 
+type SalaryEmployeeRow = {
+  id: string;
+  full_name?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  nic_number?: string | null;
+  assigned_workspace?: string | null;
+  skills?: unknown;
+  daily_wage?: number | string | null;
+  basic_salary?: number | string | null;
+  bank_name?: string | null;
+  bank_branch_name?: string | null;
+  bank_branch_code?: string | null;
+  bank_account_number?: string | null;
+  bank_account_name?: string | null;
+  status?: string | null;
+};
+
+const normalizeAssignedWorkspace = (workspace?: string | null) => {
+  const value = (workspace ?? "").trim();
+  if (value === "Solar Energy" || value === "solar") return "solar";
+  if (value === "Steel & Welding Projects" || value === "steel") return "steel";
+  if (value === "Steel Furniture Manufacturing" || value === "furniture")
+    return "furniture";
+  if (value === "Irrigation Systems" || value === "irrigation")
+    return "irrigation";
+  return "all";
+};
+
+const mapSupabaseEmployeeRow = (row: Record<string, unknown>): Employee => {
+  const value = row as {
+    id?: string;
+    full_name?: string | null;
+    name?: string | null;
+    phone?: string | null;
+    nic_number?: string | null;
+    assigned_workspace?: string | null;
+    skills?: unknown;
+    daily_wage?: number | string | null;
+    basic_salary?: number | string | null;
+    bank_name?: string | null;
+    bank_branch_name?: string | null;
+    bank_branch_code?: string | null;
+    bank_account_number?: string | null;
+    bank_account_name?: string | null;
+    status?: string | null;
+  };
+
+  const skills = Array.isArray(value.skills)
+    ? value.skills.filter((skill): skill is string => typeof skill === "string")
+    : [];
+
+  return {
+    id: value.id ?? "",
+    name: value.full_name || value.name || "Unnamed employee",
+    phone: value.phone ?? "—",
+    nic: value.nic_number ?? "—",
+    basic_salary: Number(value.basic_salary ?? 0),
+    daily_wage: Number(value.daily_wage ?? 0),
+    skills,
+    company_id: normalizeAssignedWorkspace(value.assigned_workspace),
+    status: value.status === "Inactive" ? "Inactive" : "Active",
+    bank_name: value.bank_name ?? undefined,
+    branch_code: value.bank_branch_code ?? value.bank_branch_name ?? undefined,
+    account_number: value.bank_account_number ?? undefined,
+    account_name: value.bank_account_name ?? undefined,
+  };
+};
+
 /** SS Global Salary: daily wages, employee-linked project labor, and advances stay synchronized through the shared local ledger. */
 export default function Salary() {
   const { fieldId } = useBusinessField();
-  const [employeeId, setEmployeeId] = useState(initialEmployees[0]?.id ?? "");
+  const [supabaseEmployees, setSupabaseEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [employeeId, setEmployeeId] = useState("");
   const [daysWorked, setDaysWorked] = useState("26");
   const [laborAllocations, setLaborAllocations] =
     useState(loadLaborAllocations);
   const [advances, setAdvances] = useState(loadSalaryAdvances);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceNote, setAdvanceNote] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadEmployees = async () => {
+      try {
+        setLoadingEmployees(true);
+        const rows = await listErpRows<SalaryEmployeeRow>(
+          "employees",
+          "id,full_name,phone,nic_number,assigned_workspace,skills,daily_wage,basic_salary,bank_name,bank_branch_name,bank_branch_code,bank_account_number,bank_account_name,status"
+        );
+        if (!active) return;
+        const mapped = rows.map(mapSupabaseEmployeeRow);
+        setSupabaseEmployees(mapped);
+        setEmployeeId(current =>
+          mapped.some(item => item.id === current) ? current : mapped[0]?.id ?? ""
+        );
+      } catch (error) {
+        if (!active) return;
+        setSupabaseEmployees([]);
+        setEmployeeId("");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Unable to load employees from Supabase."
+        );
+      } finally {
+        if (active) setLoadingEmployees(false);
+      }
+    };
+
+    void loadEmployees();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const employees = useMemo(
     () =>
-      initialEmployees.filter(
+      supabaseEmployees.filter(
         employee => fieldId === "all" || employee.company_id === fieldId
       ),
-    [fieldId]
+    [fieldId, supabaseEmployees]
   );
-  const employee = initialEmployees.find(item => item.id === employeeId) ??
+
+  useEffect(() => {
+    if (employees.length === 0) {
+      if (employeeId !== "") setEmployeeId("");
+      return;
+    }
+    if (!employees.some(item => item.id === employeeId)) {
+      setEmployeeId(employees[0].id);
+    }
+  }, [employeeId, employees]);
+
+  const employee = employees.find(item => item.id === employeeId) ??
     employees[0] ?? {
       id: "",
       name: "No employees available",
